@@ -5,59 +5,81 @@ const ThreeScene = () => {
   const mountRef = useRef(null);
 
   useEffect(() => {
-    // Create scene, camera, and renderer
+    // Create the scene, camera, and renderer
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 5;
+    camera.position.z = 10;
 
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     mountRef.current.appendChild(renderer.domElement);
 
-    // Create a cube with basic material
+    // Create two initial cubes
     const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
+    const material1 = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const material2 = new THREE.MeshBasicMaterial({ color: 0x0000ff });
 
-    // Animation variables
-    let speed = 0.05;
-    let direction = 1;
+    const cube1 = new THREE.Mesh(geometry, material1);
+    const cube2 = new THREE.Mesh(geometry, material2);
 
-    // Mouse move event handler
-    const onMouseMove = (event) => {
-      const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-      const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+    cube1.position.x = -3;
+    cube2.position.x = 3;
 
-      // Rotate the cube based on mouse position
-      cube.rotation.x = mouseY * Math.PI;
-      cube.rotation.y = mouseX * Math.PI;
+    scene.add(cube1);
+    scene.add(cube2);
 
-      // Change color based on mouse position
-      const color = new THREE.Color(`hsl(${(mouseX + 1) * 180}, 100%, 50%)`);
-      material.color.set(color);
-    };
+    let speed = 0.02;
+    let hasSplit = false;
+    let newCubes = [];
 
-    // Add event listener for mouse move
-    window.addEventListener('mousemove', onMouseMove);
-
-    // Animation loop
+    // Animation function
     const animate = () => {
       requestAnimationFrame(animate);
 
-      // Make the cube bounce vertically
-      cube.position.y += speed * direction;
-      if (cube.position.y > 2 || cube.position.y < -2) {
-        direction *= -1; // Reverse direction at bounds
+      if (!hasSplit) {
+        // Move the initial cubes towards each other
+        if (cube1.position.x < 0) cube1.position.x += speed;
+        if (cube2.position.x > 0) cube2.position.x -= speed;
+
+        // Check for collision and split into 4 cubes
+        if (Math.abs(cube1.position.x - cube2.position.x) < 0.1) {
+          console.log('Collision detected! Splitting cubes...');
+          hasSplit = true;
+
+          scene.remove(cube1, cube2);
+
+          // Create four new smaller cubes
+          for (let i = 0; i < 4; i++) {
+            const newCube = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xff69b4 }));
+            newCube.scale.set(0.5, 0.5, 0.5);
+            newCubes.push(newCube);
+            scene.add(newCube);
+            newCube.position.set(0, 0, 0); // Start from the collision point
+          }
+
+          // Assign directions for each cube
+          newCubes[0].velocity = { x: 0.05, y: 0.05 };  // Top-right
+          newCubes[1].velocity = { x: -0.05, y: 0.05 }; // Top-left
+          newCubes[2].velocity = { x: 0.05, y: -0.05 }; // Bottom-right
+          newCubes[3].velocity = { x: -0.05, y: -0.05 }; // Bottom-left
+        }
+      }
+
+      // Move the smaller cubes after collision
+      if (hasSplit) {
+        newCubes.forEach(cube => {
+          cube.position.x += cube.velocity.x;
+          cube.position.y += cube.velocity.y;
+        });
       }
 
       renderer.render(scene, camera);
     };
+
     animate();
 
-    // Cleanup on component unmount
+    // Cleanup function to remove renderer on component unmount
     return () => {
-      window.removeEventListener('mousemove', onMouseMove);
       mountRef.current.removeChild(renderer.domElement);
     };
   }, []);
